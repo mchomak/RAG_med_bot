@@ -1,0 +1,32 @@
+# Core RAG Framework
+llama-index==0.9.48
+llama-index-llms-ollama==0.1.2
+llama-index-embeddings-huggingface==0.1.4
+
+# Vector Database
+chromadb==0.4.22
+
+# PyTorch для работы с моделями
+torch>=2.1.0
+torchvision>=0.16.0
+
+# Transformers для эмбеддинг модели
+transformers>=4.36.0
+sentence-transformers>=2.2.2
+
+# Ollama клиент
+ollama>=0.1.6
+
+# Утилиты для работы с файлами
+tqdm>=4.66.1  # Прогресс-бары
+
+# Красивый вывод в терминале
+rich>=13.7.0
+colorama>=0.4.6
+
+# Обработка текста
+nltk>=3.8.1
+
+# Дополнительные зависимости
+python-dotenv>=1.0.0  # Для работы с .env файлами (опционально)
+pydantic>=2.5.0  # Валидация данных
