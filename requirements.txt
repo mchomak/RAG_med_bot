@@ -1,0 +1,25 @@
+# Core RAG Framework
+llama-index-core==0.10.17
+llama-index-llms-ollama==0.1.6
+llama-index-embeddings-huggingface==0.2.0
+llama-index==0.10.17
+
+# Vector Database
+chromadb==0.4.24
+llama-index-vector-stores-chroma==0.1.8
+
+# PyTorch для работы с моделями
+torch>=2.1.0
+
+# Transformers для эмбеддинг модели
+transformers>=4.36.0
+sentence-transformers>=2.2.2
+
+# Утилиты для работы с файлами
+tqdm>=4.66.1
+
+# Красивый вывод в терминале
+rich>=13.7.0
+
+# Дополнительные зависимости (встроены в llama-index)
+pydantic>=2.5.0
