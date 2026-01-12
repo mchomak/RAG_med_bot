@@ -108,7 +108,7 @@ def get_documents_folder() -> Optional[Path]:
         Path к папке или None
     """
     while True:
-        console.print("\n📁 Укажите путь к папке с документами (txt файлы):", style="bold cyan")
+        console.print("\n📁 Укажите путь к папке с документами (txt, pdf, docx):", style="bold cyan")
         folder_path = Prompt.ask("Путь к папке", default="./documents")
 
         folder_path = Path(folder_path).expanduser().resolve()
@@ -128,16 +128,27 @@ def get_documents_folder() -> Optional[Path]:
                 return None
             continue
 
-        # Проверяем наличие txt файлов
-        txt_files = list(folder_path.glob("*.txt"))
-        if not txt_files:
-            console.print(f"✗ В папке нет txt файлов: {folder_path}", style="red")
+        # Проверяем наличие поддерживаемых файлов
+        all_files = []
+        for extension in config.SUPPORTED_FILE_EXTENSIONS:
+            all_files.extend(folder_path.glob(f"*{extension}"))
+
+        if not all_files:
+            supported_formats = ", ".join(config.SUPPORTED_FILE_EXTENSIONS)
+            console.print(f"✗ В папке нет поддерживаемых файлов ({supported_formats}): {folder_path}", style="red")
             retry = Confirm.ask("Попробовать снова?", default=True)
             if not retry:
                 return None
             continue
 
-        console.print(f"✓ Найдено txt файлов: {len(txt_files)}", style="green")
+        # Показываем статистику по типам файлов
+        file_types_count = {}
+        for file_path in all_files:
+            ext = file_path.suffix.lower()
+            file_types_count[ext] = file_types_count.get(ext, 0) + 1
+
+        stats_str = ", ".join([f"{ext}: {count}" for ext, count in file_types_count.items()])
+        console.print(f"✓ Найдено файлов: {len(all_files)} ({stats_str})", style="green")
         return folder_path
 
 

@@ -107,7 +107,7 @@ COLOR_SCHEME = {
 
 # ==================== ВАЛИДАЦИЯ ====================
 # Поддерживаемые форматы файлов
-SUPPORTED_FILE_EXTENSIONS = [".txt"]
+SUPPORTED_FILE_EXTENSIONS = [".txt", ".pdf", ".docx"]
 
 # Минимальное количество документов для индексации
 MIN_DOCUMENTS = 1

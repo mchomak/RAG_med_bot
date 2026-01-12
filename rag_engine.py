@@ -34,6 +34,10 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
+# Обработка документов
+from pypdf import PdfReader
+from docx import Document as DocxDocument
+
 # Локальный конфиг
 import config
 
@@ -175,12 +179,114 @@ class RAGEngine:
             self._log(f"✗ Ошибка инициализации ChromaDB: {str(e)}", style="red")
             raise
 
+    def _extract_text_from_pdf(self, file_path: Path) -> str:
+        """
+        Извлечение текста из PDF файла
+
+        Args:
+            file_path: Путь к PDF файлу
+
+        Returns:
+            Извлеченный текст
+        """
+        try:
+            reader = PdfReader(str(file_path))
+            text_parts = []
+
+            for page_num, page in enumerate(reader.pages, 1):
+                try:
+                    text = page.extract_text()
+                    if text.strip():
+                        text_parts.append(text)
+                except Exception as e:
+                    self._log(f"⚠ Ошибка чтения страницы {page_num} в {file_path.name}: {str(e)}", style="yellow")
+                    continue
+
+            return "\n\n".join(text_parts)
+
+        except Exception as e:
+            raise Exception(f"Ошибка извлечения текста из PDF: {str(e)}")
+
+    def _extract_text_from_docx(self, file_path: Path) -> str:
+        """
+        Извлечение текста из DOCX файла
+
+        Args:
+            file_path: Путь к DOCX файлу
+
+        Returns:
+            Извлеченный текст
+        """
+        try:
+            doc = DocxDocument(str(file_path))
+            text_parts = []
+
+            # Извлекаем текст из параграфов
+            for paragraph in doc.paragraphs:
+                if paragraph.text.strip():
+                    text_parts.append(paragraph.text)
+
+            # Извлекаем текст из таблиц
+            for table in doc.tables:
+                for row in table.rows:
+                    for cell in row.cells:
+                        if cell.text.strip():
+                            text_parts.append(cell.text)
+
+            return "\n\n".join(text_parts)
+
+        except Exception as e:
+            raise Exception(f"Ошибка извлечения текста из DOCX: {str(e)}")
+
+    def _extract_text_from_txt(self, file_path: Path) -> str:
+        """
+        Извлечение текста из TXT файла
+
+        Args:
+            file_path: Путь к TXT файлу
+
+        Returns:
+            Извлеченный текст
+        """
+        try:
+            with open(file_path, 'r', encoding=config.ENCODING) as f:
+                return f.read()
+        except Exception as e:
+            raise Exception(f"Ошибка чтения TXT файла: {str(e)}")
+
+    def _extract_text_from_file(self, file_path: Path) -> Optional[str]:
+        """
+        Извлечение текста из файла в зависимости от его типа
+
+        Args:
+            file_path: Путь к файлу
+
+        Returns:
+            Извлеченный текст или None в случае ошибки
+        """
+        file_extension = file_path.suffix.lower()
+
+        try:
+            if file_extension == ".txt":
+                return self._extract_text_from_txt(file_path)
+            elif file_extension == ".pdf":
+                return self._extract_text_from_pdf(file_path)
+            elif file_extension == ".docx":
+                return self._extract_text_from_docx(file_path)
+            else:
+                self._log(f"⚠ Неподдерживаемый формат файла: {file_path.name}", style="yellow")
+                return None
+
+        except Exception as e:
+            self._log(f"⚠ Ошибка обработки {file_path.name}: {str(e)}", style="yellow")
+            return None
+
     def index_documents(self, folder_path: str) -> bool:
         """
         Индексация документов из указанной папки
 
         Args:
-            folder_path: Путь к папке с txt файлами
+            folder_path: Путь к папке с документами (txt, pdf, docx)
 
         Returns:
             True если индексация успешна, False иначе
@@ -197,29 +303,42 @@ class RAGEngine:
                 self._log(f"✗ Указанный путь не является папкой: {folder_path}", style="red")
                 return False
 
-            # Получаем список txt файлов
-            txt_files = list(folder_path.glob("*.txt"))
+            # Получаем список всех поддерживаемых файлов
+            all_files = []
+            for extension in config.SUPPORTED_FILE_EXTENSIONS:
+                all_files.extend(folder_path.glob(f"*{extension}"))
 
-            if not txt_files:
-                self._log(f"✗ В папке нет txt файлов: {folder_path}", style="red")
+            if not all_files:
+                supported_formats = ", ".join(config.SUPPORTED_FILE_EXTENSIONS)
+                self._log(f"✗ В папке нет поддерживаемых файлов ({supported_formats}): {folder_path}", style="red")
                 return False
 
-            self._log(f"\nНайдено файлов: {len(txt_files)}", style="bold cyan")
+            # Показываем статистику по типам файлов
+            file_types_count = {}
+            for file_path in all_files:
+                ext = file_path.suffix.lower()
+                file_types_count[ext] = file_types_count.get(ext, 0) + 1
+
+            stats_str = ", ".join([f"{ext}: {count}" for ext, count in file_types_count.items()])
+            self._log(f"\nНайдено файлов: {len(all_files)} ({stats_str})", style="bold cyan")
 
             # Загружаем документы
-            self._log("\nЗагрузка документов...", style="cyan")
+            self._log("\nЗагрузка и обработка документов...", style="cyan")
             documents = []
 
-            for file_path in tqdm(txt_files, desc="Чтение файлов", disable=not config.SHOW_PROGRESS_BAR):
+            for file_path in tqdm(all_files, desc="Обработка файлов", disable=not config.SHOW_PROGRESS_BAR):
                 try:
                     # Проверяем размер файла
                     if file_path.stat().st_size > config.MAX_FILE_SIZE:
                         self._log(f"⚠ Файл слишком большой, пропускаем: {file_path.name}", style="yellow")
                         continue
 
-                    # Читаем файл
-                    with open(file_path, 'r', encoding=config.ENCODING) as f:
-                        content = f.read()
+                    # Извлекаем текст в зависимости от типа файла
+                    content = self._extract_text_from_file(file_path)
+
+                    if content is None or not content.strip():
+                        self._log(f"⚠ Не удалось извлечь текст из {file_path.name}", style="yellow")
+                        continue
 
                     # Создаем документ с метаданными
                     doc = Document(
@@ -227,13 +346,14 @@ class RAGEngine:
                         metadata={
                             "file_name": file_path.name,
                             "file_path": str(file_path),
-                            "file_size": file_path.stat().st_size
+                            "file_size": file_path.stat().st_size,
+                            "file_type": file_path.suffix.lower()
                         }
                     )
                     documents.append(doc)
 
                 except Exception as e:
-                    self._log(f"⚠ Ошибка чтения файла {file_path.name}: {str(e)}", style="yellow")
+                    self._log(f"⚠ Ошибка обработки файла {file_path.name}: {str(e)}", style="yellow")
                     continue
 
             if not documents:
