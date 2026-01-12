@@ -152,8 +152,15 @@ class RAGEngine:
             os.makedirs(config.CHROMA_PERSIST_DIR, exist_ok=True)
 
             # Инициализируем ChromaDB клиент с персистентным хранилищем
+            # Отключаем телеметрию для избежания предупреждений
+            chroma_settings = ChromaSettings(
+                anonymized_telemetry=False,
+                allow_reset=True
+            )
+
             chroma_client = chromadb.PersistentClient(
-                path=config.CHROMA_PERSIST_DIR
+                path=config.CHROMA_PERSIST_DIR,
+                settings=chroma_settings
             )
 
             # Получаем или создаем коллекцию
